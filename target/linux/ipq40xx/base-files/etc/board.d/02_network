@@ -75,6 +75,9 @@ ipq40xx_setup_interfaces()
 	zyxel,nwa1123acv3)
 		ucidef_set_interface_lan "lan"
 		;;
+	zyxel,wac500h)
+		ucidef_set_interface_lan "uplink lan1 lan2"
+		;;
 	aruba,ap-303h|\
 	buffalo,wtr-m2133hp|\
 	ezviz,cs-w3-wd1200g-eup|\
@@ -225,6 +228,11 @@ ipq40xx_setup_macs()
 	netgear,srr60|\
 	pakedge,wr-1)
 		wan_mac=$(macaddr_add $(get_mac_label) 1)
+		;;
+	zyxel,wac500h)
+		# U-Boot adds a "mac-address" property to the uplink port,
+		# overriding its nvmem cell. Use the gmac (eth0) MAC instead.
+		lan_mac=$(cat /sys/class/net/eth0/address)
 		;;
 	esac
 

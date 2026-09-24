@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+#include "qcom-ipq4018-zyxel-wac500.dtsi"
+
+/ {
+	model = "Zyxel WAC500H";
+	compatible = "zyxel,wac500h";
+
+	aliases {
+		led-boot = &led_status_green;
+		led-failsafe = &led_status_red;
+		led-running = &led_status_green;
+		led-upgrade = &led_status_red;
+		ethernet0 = &swport4;
+		ethernet1 = &swport3;
+		ethernet2 = &swport2;
+		ethernet3 = &gmac;
+	};
+};
+
+/*
+ * The SPI-NAND is unreliable with the default 12mA/2mA drive strength
+ * on this board (transfer timeouts, rootfs fails to attach).
+ */
+&tlmm {
+	spi_0_pinmux {
+		pinmux {
+			drive-strength = <16>;
+		};
+
+		pinmux_cs {
+			drive-strength = <16>;
+		};
+	};
+};
+
+&swport4 {
+	status = "okay";
+
+	label = "uplink";
+	nvmem-cell-names = "mac-address";
+	nvmem-cells = <&macaddr_mrd_fff8 0>;
+};
+
+&swport3 {
+	status = "okay";
+
+	label = "lan1";
+	nvmem-cell-names = "mac-address";
+	nvmem-cells = <&macaddr_mrd_fff8 1>;
+};
+
+&swport2 {
+	status = "okay";
+
+	label = "lan2";
+	nvmem-cell-names = "mac-address";
+	nvmem-cells = <&macaddr_mrd_fff8 2>;
+};
+
+&wifi0 {
+	status = "okay";
+	nvmem-cell-names = "pre-calibration", "mac-address";
+	nvmem-cells = <&precal_art_1000>, <&macaddr_mrd_fff8 3>;
+	qcom,ath10k-calibration-variant = "Zyxel-WAC500H-2G";
+};
+
+&wifi1 {
+	status = "okay";
+	nvmem-cell-names = "pre-calibration", "mac-address";
+	nvmem-cells = <&precal_art_5000>, <&macaddr_mrd_fff8 4>;
+	qcom,ath10k-calibration-variant = "Zyxel-WAC500H-5G";
+};

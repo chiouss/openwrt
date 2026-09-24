@@ -1509,6 +1509,23 @@ define Device/zyxel_nwa1123acv3
 endef
 TARGET_DEVICES += zyxel_nwa1123acv3
 
+define Device/zyxel_wac500h
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Zyxel
+	DEVICE_MODEL := WAC500H
+	SOC := qcom-ipq4018
+	DEVICE_DTS_CONFIG := config@ap.dk01.1-c2
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	IMAGE_SIZE := 53248k
+	IMAGES += factory.bin
+	IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE) | zyxel-ipq40xx-fit
+	ZYXEL_MODEL_ID := 64 e1
+	DEVICE_PACKAGES := uboot-envtools zyxel-bootconfig-ipq807x-ipq40xx
+endef
+TARGET_DEVICES += zyxel_wac500h
+
 define Device/zyxel_wre6606
 	$(call Device/FitImage)
 	DEVICE_VENDOR := Zyxel
