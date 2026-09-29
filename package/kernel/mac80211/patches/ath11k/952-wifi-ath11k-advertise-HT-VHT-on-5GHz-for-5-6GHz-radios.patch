@@ -1,0 +1,36 @@
+From: Mark Chiou <chiouss@gmail.com>
+Subject: [PATCH] wifi: ath11k: advertise HT/VHT on 5 GHz for 5/6 GHz radios
+
+When a radio reports a frequency range that covers both 5 GHz and 6 GHz
+(e.g. QCN9074 with a 5/6 GHz board file as used on the Zyxel NWA220AX-6E),
+ath11k registers the 5 GHz and the 6 GHz band on the same wiphy but
+only sets up the HT/VHT capabilities of the 5 GHz band for single pdev
+devices. hostapd then refuses to start any HT/VHT/HE AP on 5 GHz:
+
+  Driver does not support configured HT capability [HT40*]
+
+Set up the 5 GHz HT/VHT capabilities whenever the 5 GHz band has been
+registered. 6 GHz-only radios do not register 5 GHz channels and keep
+their current behaviour.
+
+Signed-off-by: Mark Chiou <chiouss@gmail.com>
+---
+--- a/drivers/net/wireless/ath/ath11k/mac.c	2026-09-29 13:35:51.388649259 +0800
++++ b/drivers/net/wireless/ath/ath11k/mac.c	2026-09-29 13:35:51.411081072 +0800
+@@ -5766,9 +5766,15 @@
+ 						    rate_cap_rx_chainmask);
+ 	}
+ 
++	/* A radio may cover both 5 GHz and 6 GHz (e.g. QCN9074 with a
++	 * 5/6 GHz board file). Advertise HT/VHT on 5 GHz whenever the
++	 * 5 GHz band was registered, 6 GHz-only radios have no 5 GHz
++	 * channels and are not affected.
++	 */
+ 	if (cap->supported_bands & WMI_HOST_WLAN_5G_CAP &&
+ 	    (ar->ab->hw_params.single_pdev_only ||
+-	     !ar->supports_6ghz)) {
++	     !ar->supports_6ghz ||
++	     ar->mac.sbands[NL80211_BAND_5GHZ].n_channels)) {
+ 		band = &ar->mac.sbands[NL80211_BAND_5GHZ];
+ 		ht_cap = cap->band[NL80211_BAND_5GHZ].ht_cap_info;
+ 		if (ht_cap_info)
