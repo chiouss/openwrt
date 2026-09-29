@@ -328,6 +328,28 @@ define Device/yuncore_ax850
 endef
 TARGET_DEVICES += yuncore_ax850
 
+define Device/zyxel_nwa220ax-6e
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Zyxel
+	DEVICE_MODEL := NWA220AX-6E
+	SOC := ipq5018
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	NAND_SIZE := 256m
+	IMAGE_SIZE := 63488k
+	DEVICE_DTS_CONFIG := config@mp03.1
+	IMAGES += factory.bin
+	IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE) | zyxel-nwax10ax-fit
+	ZYXEL_MODEL_ID := 76 e1
+	DEVICE_PACKAGES := ath11k-firmware-ipq5018 \
+		kmod-ath11k-pci \
+		ath11k-firmware-qcn9074 \
+		ipq-wifi-zyxel_nwa220ax-6e \
+		zyxel-bootconfig-ipq
+endef
+TARGET_DEVICES += zyxel_nwa220ax-6e
+
 define Device/zyxel_scr50axe
 	$(call Device/FitImage)
 	$(call Device/UbiFit)

@@ -42,6 +42,9 @@ ipq50xx_setup_interfaces()
 	tplink,eap650-outdoor-v1)
 		ucidef_set_interface_lan "lan" "dhcp"
 		;;
+	zyxel,nwa220ax-6e)
+		ucidef_set_interface_lan "uplink lan1" "dhcp"
+		;;
 	esac
 }
 

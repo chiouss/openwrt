@@ -128,6 +128,7 @@ ALLWIFIBOARDS:= \
 	zyxel_nbg7815 \
 	zyxel_nwa110ax \
 	zyxel_nwa210ax \
+	zyxel_nwa220ax-6e \
 	zyxel_scr50axe
 
 ALLWIFIPACKAGES:=$(foreach BOARD,$(ALLWIFIBOARDS),ipq-wifi-$(BOARD))
@@ -332,6 +333,7 @@ $(eval $(call generate-ipq-wifi-package,zte_mf287plus,ZTE MF287Plus))
 $(eval $(call generate-ipq-wifi-package,zyxel_nbg7815,Zyxel NBG7815))
 $(eval $(call generate-ipq-wifi-package,zyxel_nwa110ax,Zyxel NWA110AX))
 $(eval $(call generate-ipq-wifi-package,zyxel_nwa210ax,Zyxel NWA210AX))
+$(eval $(call generate-ipq-wifi-package,zyxel_nwa220ax-6e,Zyxel NWA220AX-6E))
 $(eval $(call generate-ipq-wifi-package,zyxel_scr50axe,Zyxel SCR50AXE))
 
 $(foreach PACKAGE,$(ALLWIFIPACKAGES),$(eval $(call BuildPackage,$(PACKAGE))))
