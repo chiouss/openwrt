@@ -16,6 +16,13 @@ include $(INCLUDE_DIR)/package.mk
 define Build/Compile
 endef
 
+# LOCAL ONLY, do not upstream: pick up board files that are not yet in
+# the qca-wireless repository from ./local
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	$(if $(wildcard ./local/board-*),$(CP) ./local/board-* $(PKG_BUILD_DIR)/)
+endef
+
 # Use ath10k-bdencoder from https://github.com/qca/qca-swiss-army-knife.git
 # to generate the board-* files here.
 #
