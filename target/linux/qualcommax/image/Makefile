@@ -1,6 +1,15 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
+DEVICE_VARS += ZYXEL_MODEL_ID
+
+define Build/zyxel-nwax10ax-fit
+	$(TOPDIR)/scripts/mkits-zyxel-fit-filogic.sh \
+		$@.its $@ "$(ZYXEL_MODEL_ID) ff ff ff ff ff ff ff ff"
+	PATH=$(LINUX_DIR)/scripts/dtc:$(PATH) mkimage -f $@.its $@.new
+	@mv $@.new $@
+endef
+
 define Device/Default
 	PROFILES := Default
 	KERNEL_LOADADDR := 0x41000000

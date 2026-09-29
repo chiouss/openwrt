@@ -1,5 +1,5 @@
 DTS_DIR := $(DTS_DIR)/qcom
-DEVICE_VARS += NETGEAR_BOARD_ID NETGEAR_FLASH_SCRIPT NETGEAR_HW_ID TPLINK_SUPPORT_STRING ZYXEL_MODEL_ID
+DEVICE_VARS += NETGEAR_BOARD_ID NETGEAR_FLASH_SCRIPT NETGEAR_HW_ID TPLINK_SUPPORT_STRING
 
 define Build/asus-fake-ramdisk
 	rm -rf $(KDIR)/tmp/fakerd
@@ -44,13 +44,6 @@ define Build/wax6xx-netgear-tar
 	$(TAR) -C $@.tmp/ -cf $@ --sort=name --numeric-owner --owner=0 --group=0 --mode=go-w \
 		$(if $(SOURCE_DATE_EPOCH),--mtime="@$(SOURCE_DATE_EPOCH)") .
 	rm -rf $@.tmp
-endef
-
-define Build/zyxel-nwax10ax-fit
-	$(TOPDIR)/scripts/mkits-zyxel-fit-filogic.sh \
-		$@.its $@ "$(ZYXEL_MODEL_ID) ff ff ff ff ff ff ff ff"
-	PATH=$(LINUX_DIR)/scripts/dtc:$(PATH) mkimage -f $@.its $@.new
-	@mv $@.new $@
 endef
 
 define Device/aliyun_ap8220
