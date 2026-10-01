@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include "ipq5018-zyxel-6e.dtsi"
+#include "ipq5018-qcn6122.dtsi"
+
+/ {
+	model = "Zyxel WAX640S-6E";
+	compatible = "zyxel,wax640s-6e", "qcom,ipq5018";
+};
+
+&blsp1_i2c3 {
+	status = "okay";
+
+	pinctrl-0 = <&i2c_pins>;
+	pinctrl-names = "default";
+
+	lp5562@30 {
+		compatible = "ti,lp5562";
+		reg = <0x30>;
+		clock-mode = [02];
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		led_status_red: led@0 {
+			reg = <0>;
+			chan-name = "lp5562_red";
+			led-cur = [20];
+			max-cur = [60];
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_status_green: led@1 {
+			reg = <1>;
+			chan-name = "lp5562_green";
+			led-cur = [20];
+			max-cur = [60];
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_status_blue: led@2 {
+			reg = <2>;
+			chan-name = "lp5562_blue";
+			led-cur = [20];
+			max-cur = [60];
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+		};
+
+		led_status_white: led@3 {
+			reg = <3>;
+			chan-name = "lp5562_white";
+			led-cur = [20];
+			max-cur = [60];
+			color = <LED_COLOR_ID_WHITE>;
+			function = LED_FUNCTION_STATUS;
+		};
+	};
+};
+
+&tlmm {
+	i2c_pins: i2c-state {
+		pins = "gpio25", "gpio26";
+		function = "blsp2_i2c1";
+		drive-strength = <8>;
+		bias-disable;
+	};
+
+	/* antenna direction select, all low as set up by the vendor firmware */
+	ant-dir-hog {
+		gpio-hog;
+		gpios = <14 GPIO_ACTIVE_HIGH>,
+			<16 GPIO_ACTIVE_HIGH>,
+			<17 GPIO_ACTIVE_HIGH>,
+			<19 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "ant-dir";
+	};
+
+	rst-radio-hog {
+		gpio-hog;
+		gpios = <24 GPIO_ACTIVE_HIGH>,
+			<40 GPIO_ACTIVE_HIGH>;
+		output-high;
+		line-name = "rst-radio";
+	};
+};
+
+&pcie_wifi {
+	qcom,ath11k-calibration-variant = "Zyxel-WAX640S-6E";
+
+	ieee80211-freq-limit = <5945000 7125000>;
+};
+
+&q6v5_wcss {
+	/* QCN6102: PCIe1, user PD 2, reset GPIO18 */
+	boot-args = <0x2 4 2 18 0 0>;
+};
+
+&wifi {
+	status = "okay";
+
+	qcom,rproc = <&q6_wcss_pd1>;
+	qcom,userpd-subsys-name = "q6v5_wcss_userpd1";
+	qcom,ath11k-calibration-variant = "Zyxel-WAX640S-6E";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,bdf-addr = <0x4c400000>;
+};
+
+&wifi1 {
+	status = "okay";
+
+	qcom,rproc = <&q6_wcss_pd2>;
+	qcom,userpd-subsys-name = "q6v5_wcss_userpd2";
+	qcom,ath11k-calibration-variant = "Zyxel-WAX640S-6E";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,bdf-addr = <0x4d100000>;
+	qcom,m3-dump-addr = <0x4df00000>;
+};

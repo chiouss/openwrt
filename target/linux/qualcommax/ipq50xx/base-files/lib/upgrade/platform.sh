@@ -257,7 +257,8 @@ platform_do_upgrade() {
 		CI_DATA_UBIPART="rootfs"
 		nand_do_upgrade "$1"
 		;;
-	zyxel,nwa220ax-6e)
+	zyxel,nwa220ax-6e|\
+	zyxel,wax640s-6e)
 		# Zyxel U-Boot always passes ubi.mtd=rootfs, so OpenWrt
 		# can only run from image0. The zyxel-bootconfig preinit
 		# hook keeps image0 selected in 0:bootconfig{,1}.

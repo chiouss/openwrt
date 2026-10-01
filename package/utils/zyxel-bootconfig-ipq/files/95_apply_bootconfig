@@ -4,7 +4,8 @@ apply_bootconfig() {
 	case $(board_name) in
 	zyxel,nwa110ax|\
 	zyxel,nwa210ax|\
-	zyxel,nwa220ax-6e)
+	zyxel,nwa220ax-6e|\
+	zyxel,wax640s-6e)
 		status="$(zyxel-bootconfig-ipq show | awk '/image0:/ {print $2}')"
 		[ "$status" != "selected" ] && zyxel-bootconfig-ipq --force set image0
 		;;

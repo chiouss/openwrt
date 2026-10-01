@@ -38,7 +38,8 @@ xiaomi,redmi-ax5400)
 	ucidef_set_led_netdev "wan-port-link-top-blue" "WAN-PORT-LINK-TOP-BLUE" "blue:wan" "wan" "link_1000"
 	ucidef_set_led_netdev "wan-port-link-top-yellow" "WAN-PORT-LINK-TOP-YELLOW" "yellow:wan" "wan" "link_10 link_100"
 	;;
-zyxel,nwa220ax-6e)
+zyxel,nwa220ax-6e|\
+zyxel,wax640s-6e)
 	ucidef_set_led_netdev "uplink-2500" "UPLINK-2500" "90000.mdio-1:10:green:lan" "uplink" "link_2500 tx rx"
 	ucidef_set_led_netdev "uplink-1000" "UPLINK-1000" "90000.mdio-1:10:amber:lan" "uplink" "link_10 link_100 link_1000 tx rx"
 	ucidef_set_led_netdev "lan1-1000" "LAN1-1000" "88000.mdio-1:07:green:lan" "lan1" "link_1000 tx rx"

@@ -364,3 +364,26 @@ define Device/zyxel_scr50axe
 		ipq-wifi-zyxel_scr50axe
 endef
 TARGET_DEVICES += zyxel_scr50axe
+
+define Device/zyxel_wax640s-6e
+	$(call Device/FitImage)
+	$(call Device/UbiFit)
+	DEVICE_VENDOR := Zyxel
+	DEVICE_MODEL := WAX640S-6E
+	SOC := ipq5018
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	NAND_SIZE := 256m
+	IMAGE_SIZE := 63488k
+	DEVICE_DTS_CONFIG := config@mp03.3
+	IMAGES += factory.bin
+	IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE) | zyxel-nwax10ax-fit
+	ZYXEL_MODEL_ID := 74 e1
+	DEVICE_PACKAGES := ath11k-firmware-ipq5018-qcn6122 \
+		kmod-ath11k-pci \
+		ath11k-firmware-qcn9074 \
+		kmod-leds-lp5562 \
+		ipq-wifi-zyxel_wax640s-6e \
+		zyxel-bootconfig-ipq
+endef
+TARGET_DEVICES += zyxel_wax640s-6e
