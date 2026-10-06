@@ -9,7 +9,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=zyxel-bootconfig-ipq807x
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_FLAGS:=nonshared
 
 include $(INCLUDE_DIR)/package.mk
@@ -19,7 +19,7 @@ define Package/zyxel-bootconfig-ipq807x
 	CATEGORY:=Base system
 	TITLE:=Utility for handling Zyxel bootconfig settings on ipq807x devices
 	MAINTAINER:=Pascal Beleiu <pascal@beleiu.de>
-	DEPENDS:=@TARGET_qualcommax_ipq807x
+	DEPENDS:=@(TARGET_qualcommax_ipq807x||TARGET_qualcommbe_ipq53xx)
 endef
 
 define Package/zyxel-bootconfig-ipq807x/description
