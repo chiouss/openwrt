@@ -56,6 +56,7 @@ define Device/zyxel_nwa50be
 	ZYXEL_MODEL_ID_1 := 95 e1
 	ZYXEL_MODEL_ID_2 := 96 e1
 	ZYXEL_MODEL_ID_3 := 97 e1
-	DEVICE_PACKAGES := kmod-ath12k zyxel-bootconfig-ipq807x
+	DEVICE_PACKAGES := kmod-ath12k ath12k-firmware-ipq5332-local \
+		zyxel-bootconfig-ipq807x
 endef
 TARGET_DEVICES += zyxel_nwa50be
