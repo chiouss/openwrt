@@ -11,6 +11,7 @@ ipq53xx_setup_interfaces()
 	local board="$1"
 
 	case "$board" in
+	zyxel,nwa110be|\
 	zyxel,nwa50be)
 		ucidef_set_interface_lan "uplink" "dhcp"
 		;;

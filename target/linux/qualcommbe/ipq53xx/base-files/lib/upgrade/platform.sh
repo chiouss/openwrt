@@ -30,6 +30,7 @@ platform_check_image() {
 
 platform_do_upgrade() {
 	case "$(board_name)" in
+	zyxel,nwa110be|\
 	zyxel,nwa50be)
 		# Zyxel U-Boot always passes ubi.mtd=rootfs, so OpenWrt
 		# can only run from image0. The zyxel-bootconfig preinit

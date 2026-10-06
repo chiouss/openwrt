@@ -32,10 +32,41 @@ define Build/zyxel-fit-ipq53xx
 	@mv $@.new $@
 endef
 
-define Device/zyxel_nwa50be
+define Device/zyxel_ipq5332_common
 	$(call Device/FitImageLzma)
 	$(call Device/UbiFit)
 	DEVICE_VENDOR := Zyxel
+	SOC := ipq5332
+	BLOCKSIZE := 128k
+	PAGESIZE := 2048
+	NAND_SIZE := 256m
+	IMAGE_SIZE := 71680k
+	IMAGES += factory.bin
+	IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE) | zyxel-fit-ipq53xx
+	ZYXEL_MODEL_ID_0 :=
+	ZYXEL_MODEL_ID_1 :=
+	ZYXEL_MODEL_ID_2 :=
+	ZYXEL_MODEL_ID_3 :=
+	ZYXEL_MODEL_ID_4 :=
+	DEVICE_PACKAGES := kmod-ath12k ath12k-firmware-ipq5332-local \
+		zyxel-bootconfig-ipq807x
+endef
+
+define Device/zyxel_nwa110be
+	$(call Device/zyxel_ipq5332_common)
+	DEVICE_MODEL := NWA110BE
+	DEVICE_ALT0_VENDOR := Zyxel
+	DEVICE_ALT0_MODEL := WBE510D
+	DEVICE_DTS := ipq5332-zyxel-nwa110be
+	DEVICE_DTS_CONFIG := config@mi01.6
+	ZYXEL_MODEL_ID_0 := 90 e1
+	ZYXEL_MODEL_ID_1 := 92 e1
+	DEVICE_PACKAGES += ath12k-firmware-qcn9274-local ath12k-board-zyxel_nwa110be
+endef
+TARGET_DEVICES += zyxel_nwa110be
+
+define Device/zyxel_nwa50be
+	$(call Device/zyxel_ipq5332_common)
 	DEVICE_MODEL := NWA50BE
 	DEVICE_ALT0_VENDOR := Zyxel
 	DEVICE_ALT0_MODEL := NWA50BE PRO
@@ -45,18 +76,10 @@ define Device/zyxel_nwa50be
 	DEVICE_ALT2_MODEL := NWA90BE PRO
 	DEVICE_DTS := ipq5332-zyxel-nwa50be
 	DEVICE_DTS_CONFIG := config@mi01.3
-	SOC := ipq5332
-	BLOCKSIZE := 128k
-	PAGESIZE := 2048
-	NAND_SIZE := 256m
-	IMAGE_SIZE := 71680k
-	IMAGES += factory.bin
-	IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE) | zyxel-fit-ipq53xx
 	ZYXEL_MODEL_ID_0 := 94 e1
 	ZYXEL_MODEL_ID_1 := 95 e1
 	ZYXEL_MODEL_ID_2 := 96 e1
 	ZYXEL_MODEL_ID_3 := 97 e1
-	DEVICE_PACKAGES := kmod-ath12k ath12k-firmware-ipq5332-local \
-		zyxel-bootconfig-ipq807x
+	DEVICE_PACKAGES += ath12k-board-zyxel_nwa50be
 endef
 TARGET_DEVICES += zyxel_nwa50be
