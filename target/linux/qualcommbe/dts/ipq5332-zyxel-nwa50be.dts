@@ -1,0 +1,462 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include <arm64/qcom/ipq5332.dtsi>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Zyxel NWA50BE";
+	compatible = "zyxel,nwa50be", "qcom,ipq5332";
+
+	aliases {
+		serial0 = &blsp1_uart0;
+		led-boot = &led_status_green;
+		led-failsafe = &led_status_red;
+		led-running = &led_status_green;
+		led-upgrade = &led_status_white;
+		label-mac-device = &port_uplink;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs-append = " root=/dev/ubiblock0_1";
+	};
+
+	reserved-memory {
+		m3_dump: m3-dump@4d400000 {
+			reg = <0x0 0x4d400000 0x0 0x100000>;
+			no-map;
+		};
+
+		q6_caldb: q6-caldb@4d500000 {
+			reg = <0x0 0x4d500000 0x0 0x500000>;
+			no-map;
+		};
+
+		mlo_mem: mlo-global-mem@4db00000 {
+			reg = <0x0 0x4db00000 0x0 0x1200000>;
+			no-map;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-0 = <&led_pins>;
+		pinctrl-names = "default";
+
+		led-0 {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&tlmm 22 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_status_white: led-1 {
+			color = <LED_COLOR_ID_WHITE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&tlmm 43 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_status_red: led-2 {
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&tlmm 44 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_status_green: led-3 {
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&tlmm 45 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&button_pins>;
+		pinctrl-names = "default";
+
+		reset-button {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
+			debounce-interval = <60>;
+		};
+	};
+};
+
+&blsp1_uart0 {
+	pinctrl-0 = <&serial_0_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&sleep_clk {
+	clock-frequency = <32000>;
+};
+
+&xo_board {
+	clock-frequency = <24000000>;
+};
+
+&blsp1_spi0 {
+	pinctrl-0 = <&spi_0_data_clk_pins &spi_0_cs_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "0:sbl1";
+				reg = <0x000000 0x080000>;
+				read-only;
+			};
+
+			partition@80000 {
+				label = "0:mibib";
+				reg = <0x080000 0x010000>;
+				read-only;
+			};
+
+			partition@90000 {
+				label = "0:bootconfig";
+				reg = <0x090000 0x010000>;
+			};
+
+			partition@a0000 {
+				label = "0:qsee";
+				reg = <0x0a0000 0x170000>;
+				read-only;
+			};
+
+			partition@210000 {
+				label = "0:devcfg";
+				reg = <0x210000 0x010000>;
+				read-only;
+			};
+
+			partition@220000 {
+				label = "0:tme";
+				reg = <0x220000 0x020000>;
+				read-only;
+			};
+
+			partition@240000 {
+				label = "0:cdt";
+				reg = <0x240000 0x010000>;
+				read-only;
+			};
+
+			partition@250000 {
+				label = "0:appsblenv";
+				reg = <0x250000 0x010000>;
+			};
+
+			partition@260000 {
+				label = "0:appsbl";
+				reg = <0x260000 0x0a0000>;
+				read-only;
+			};
+
+			partition@300000 {
+				label = "0:art";
+				reg = <0x300000 0x100000>;
+				read-only;
+			};
+
+			partition@400000 {
+				label = "0:bootconfig1";
+				reg = <0x400000 0x010000>;
+			};
+
+			partition@410000 {
+				label = "0:qsee_1";
+				reg = <0x410000 0x170000>;
+				read-only;
+			};
+
+			partition@580000 {
+				label = "0:devcfg_1";
+				reg = <0x580000 0x010000>;
+				read-only;
+			};
+
+			partition@590000 {
+				label = "0:tme_1";
+				reg = <0x590000 0x020000>;
+				read-only;
+			};
+
+			partition@5b0000 {
+				label = "0:cdt_1";
+				reg = <0x5b0000 0x010000>;
+				read-only;
+			};
+
+			partition@5c0000 {
+				label = "0:appsbl_1";
+				reg = <0x5c0000 0x0a0000>;
+				read-only;
+			};
+
+			partition@660000 {
+				label = "mrd";
+				reg = <0x660000 0x010000>;
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					macaddr_mrd_fff8: macaddr@fff8 {
+						compatible = "mac-base";
+						reg = <0xfff8 0x6>;
+						#nvmem-cell-cells = <1>;
+					};
+				};
+			};
+
+			partition@670000 {
+				label = "mrd_1";
+				reg = <0x670000 0x010000>;
+				read-only;
+			};
+
+			partition@680000 {
+				label = "reserved";
+				reg = <0x680000 0x980000>;
+				read-only;
+			};
+		};
+	};
+};
+
+&qpic_bam {
+	status = "okay";
+};
+
+&qpic_nand {
+	pinctrl-0 = <&qspi_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		nand-ecc-engine = <&qpic_nand>;
+		nand-ecc-strength = <8>;
+		nand-ecc-step-size = <512>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "0:training";
+				reg = <0x0000000 0x0080000>;
+				read-only;
+			};
+
+			partition@80000 {
+				label = "0:license";
+				reg = <0x0080000 0x0040000>;
+				read-only;
+			};
+
+			/* image0: U-Boot always passes ubi.mtd=rootfs */
+			partition@c0000 {
+				label = "rootfs";
+				reg = <0x00c0000 0x4600000>;
+				linux,rootfs;
+			};
+
+			/* image1 */
+			partition@46c0000 {
+				label = "rootfs_1";
+				reg = <0x46c0000 0x4600000>;
+			};
+
+			partition@8cc0000 {
+				label = "zyxel_rootfs_data";
+				reg = <0x8cc0000 0x3c00000>;
+				read-only;
+			};
+
+			partition@c8c0000 {
+				label = "logs";
+				reg = <0xc8c0000 0x2840000>;
+			};
+
+			partition@f100000 {
+				label = "myzyxel";
+				reg = <0xf100000 0x0f00000>;
+				read-only;
+			};
+		};
+	};
+};
+
+&mdio {
+	pinctrl-0 = <&mdio1_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	qca8081: ethernet-phy@1c {
+		compatible = "ethernet-phy-id004d.d101";
+		reg = <28>;
+		reset-gpios = <&tlmm 51 GPIO_ACTIVE_LOW>;
+		reset-assert-us = <10000>;
+		reset-deassert-us = <150000>;
+
+		leds {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			/* 2.5G link/activity */
+			led@0 {
+				reg = <0>;
+				color = <LED_COLOR_ID_GREEN>;
+				function = LED_FUNCTION_LAN;
+				default-state = "keep";
+			};
+
+			/* 10/100/1000 link/activity */
+			led@2 {
+				reg = <2>;
+				color = <LED_COLOR_ID_AMBER>;
+				function = LED_FUNCTION_LAN;
+				default-state = "keep";
+			};
+		};
+	};
+};
+
+&q6v5_wcss {
+	firmware-name = "ath12k/IPQ5332/hw1.0/q6_fw0.mdt";
+	qcom,bootargs_smem = <507>;
+	upd-firmware-names = "ath12k/IPQ5332/hw1.0/q6_fw1.mdt";
+};
+
+&qcom_ppe {
+	status = "okay";
+
+	ethernet-ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port_uplink: port@2 {
+			reg = <2>;
+			label = "uplink";
+			phy-mode = "sgmii";
+			managed = "in-band-status";
+			phy-handle = <&qca8081>;
+			pcs-handle = <&pcs1_ch0>;
+			nvmem-cells = <&macaddr_mrd_fff8 0>;
+			nvmem-cell-names = "mac-address";
+			clocks = <&nsscc NSS_CC_PORT2_MAC_CLK>,
+				 <&nsscc NSS_CC_PORT2_RX_CLK>,
+				 <&nsscc NSS_CC_PORT2_TX_CLK>;
+			clock-names = "mac",
+				      "rx",
+				      "tx";
+			resets = <&nsscc NSS_CC_PORT2_MAC_CLK_ARES>,
+				 <&nsscc NSS_CC_PORT2_RX_CLK_ARES>,
+				 <&nsscc NSS_CC_PORT2_TX_CLK_ARES>;
+			reset-names = "mac",
+				      "rx",
+				      "tx";
+		};
+	};
+};
+
+&pcs1 {
+	status = "okay";
+};
+
+&tlmm {
+	button_pins: button-state {
+		pins = "gpio30";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	led_pins: led-state {
+		pins = "gpio22", "gpio43", "gpio44", "gpio45";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-down;
+	};
+
+	mdio1_pins: mdio1-state {
+		mdc-pins {
+			pins = "gpio27";
+			function = "mdc1";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		mdio-pins {
+			pins = "gpio28";
+			function = "mdio1";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+	};
+
+	qspi_pins: qspi-state {
+		clk-pins {
+			pins = "gpio13";
+			function = "qspi_clk";
+			drive-strength = <8>;
+			bias-pull-down;
+		};
+
+		cs-pins {
+			pins = "gpio12";
+			function = "qspi_cs";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+
+		data-pins {
+			pins = "gpio8", "gpio9", "gpio10", "gpio11";
+			function = "qspi_data";
+			drive-strength = <8>;
+			bias-pull-down;
+		};
+	};
+
+	spi_0_data_clk_pins: spi-0-data-clk-state {
+		pins = "gpio14", "gpio15", "gpio16";
+		function = "blsp0_spi";
+		drive-strength = <2>;
+		bias-pull-down;
+	};
+
+	spi_0_cs_pins: spi-0-cs-state {
+		pins = "gpio17";
+		function = "blsp0_spi";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+};
+
+&wifi0 {
+	memory-region = <&q6_region>, <&m3_dump>, <&q6_caldb>, <&mlo_mem>;
+	memory-region-names = "q6-region", "m3-dump", "q6-caldb", "mlo-global-mem";
+	qcom,ath12k-board-id = <18>;
+	qcom,rproc = <&q6v5_wcss>;
+	status = "okay";
+};

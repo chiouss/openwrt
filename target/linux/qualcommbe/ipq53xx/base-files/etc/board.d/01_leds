@@ -1,0 +1,16 @@
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+
+board=$(board_name)
+
+case "$board" in
+zyxel,nwa50be)
+	ucidef_set_led_netdev "uplink-2500" "UPLINK-2500" "90000.mdio-1:1c:green:lan" "uplink" "link_2500 tx rx"
+	ucidef_set_led_netdev "uplink-1000" "UPLINK-1000" "90000.mdio-1:1c:amber:lan" "uplink" "link_10 link_100 link_1000 tx rx"
+	;;
+esac
+
+board_config_flush
+
+exit 0
