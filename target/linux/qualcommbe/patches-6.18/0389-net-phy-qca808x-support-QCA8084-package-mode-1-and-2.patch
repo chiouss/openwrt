@@ -1,0 +1,498 @@
+From: Mark Chiou <chiouss@gmail.com>
+Date: Wed, 7 Oct 2026 14:10:00 +0800
+Subject: [PATCH] net: phy: qca808x: support QCA8084 package mode 1 and 2
+
+Only the package mode 10G-QXGMII was implemented. In the package mode
+QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_MAC and
+QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY, as used by the QCA8386 switch,
+PCS1 was never configured, so the 312.5MHz clock that PCS1 generates for
+the switch core, AHB and APB bridge clocks of the package was missing:
+
+  nss_cc_apb_bridge_clk status stuck at 'off'
+
+Configure PCS1 as SGMII+ of switch MAC0 before the package clocks are
+enabled.
+
+In the package mode QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY, PHY3 bypasses
+the switch core and connects to the SoC through PCS0 working on the PHY
+side of SGMII. Configure PCS0 accordingly, and on link change switch it
+between SGMII and SGMII+, set the rate of the GMII clocks between PHY3
+and PCS0 and reset the datapath, following the vendor SDK. The GMII
+clocks and resets are taken from the PCS0 node. Half duplex is not
+supported on this path.
+
+Signed-off-by: Mark Chiou <chiouss@gmail.com>
+---
+--- a/drivers/net/phy/qcom/qca808x.c
++++ b/drivers/net/phy/qcom/qca808x.c
+@@ -179,8 +179,10 @@
+ 
+ struct qca808x_shared_priv {
+ 	int package_mode;
++	int phy3_addr;			/* MDIO address of PHY3 */
+ 	struct clk *clk[PACKAGE_CLK_MAX];
+-	struct mdio_device *mdiodev[2];	/* PCS and XPCS mdio device */
++	struct mdio_device *mdiodev[2];	/* PCS1 PCS and XPCS mdio device */
++	struct mdio_device *pcs0_mdiodev;
+ };
+ 
+ static const char *const qca8084_package_clk_name[PACKAGE_CLK_MAX] = {
+@@ -267,6 +269,17 @@
+ 	return ret;
+ };
+ 
++/* In the package mode QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY, PHY3 bypasses
++ * the switch core and is connected to the SoC through PCS0.
++ */
++static bool qca8084_is_bypass_phy(struct phy_device *phydev)
++{
++	struct qca808x_shared_priv *shared_priv = phy_package_get_priv(phydev);
++
++	return shared_priv->package_mode == QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY &&
++	       phydev->mdio.addr == shared_priv->phy3_addr;
++}
++
+ static int qca808x_phy_fast_retrain_config(struct phy_device *phydev)
+ {
+ 	int ret;
+@@ -963,12 +976,40 @@
+ 					      shared_priv->mdiodev[0]);
+ 		if (ret)
+ 			return ret;
++	} else if (shared_priv->package_mode !=
++		   QCA808X_PCS1_10G_QXGMII_PCS0_UNUNSED) {
++		/* PCS1 is SGMII+ of switch MAC0 and supplies the 312.5MHz
++		 * clock to the package clocks initialized below.
++		 */
++		if (!shared_priv->mdiodev[0]) {
++			phydev_err(phydev, "PCS1 is not defined\n");
++			return -EINVAL;
++		}
++
++		ret = qca8084_pcs_sgmii_mac_init(shared_priv->mdiodev[0],
++						 PHY_INTERFACE_MODE_2500BASEX);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	/* Initialize the PHY package clock and reset, which is the
+ 	 * necessary config sequence after GPIO reset on the PHY package.
+ 	 */
+-	return qca8084_package_clock_init(shared_priv);
++	ret = qca8084_package_clock_init(shared_priv);
++	if (ret)
++		return ret;
++
++	/* Configure PCS0 working on the PHY side of SGMII for PHY3 */
++	if (shared_priv->package_mode == QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY) {
++		if (!shared_priv->pcs0_mdiodev) {
++			phydev_err(phydev, "PCS0 is not defined\n");
++			return -EINVAL;
++		}
++
++		ret = qca8084_pcs_bypass_init(shared_priv->pcs0_mdiodev);
++	}
++
++	return ret;
+ }
+ 
+ static int qca8084_config_init(struct phy_device *phydev)
+@@ -987,6 +1028,16 @@
+ 	else
+ 		qca808x_fill_possible_interfaces(phydev);
+ 
++	/* Half duplex is not supported by PHY3 bypassing the switch core */
++	if (qca8084_is_bypass_phy(phydev)) {
++		linkmode_clear_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
++				   phydev->supported);
++		linkmode_clear_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
++				   phydev->supported);
++		linkmode_and(phydev->advertising, phydev->advertising,
++			     phydev->supported);
++	}
++
+ 	/* Configure the ADC to convert the signal using falling edge
+ 	 * instead of the default rising edge.
+ 	 */
+@@ -1010,6 +1061,14 @@
+ 	struct qca808x_shared_priv *shared_priv;
+ 	int ret;
+ 
++	/* Configure PCS0 and the GMII clocks of PHY3 for the link speed */
++	if (qca8084_is_bypass_phy(phydev)) {
++		shared_priv = phy_package_get_priv(phydev);
++		qca8084_pcs_bypass_set_speed(shared_priv->pcs0_mdiodev,
++					     phydev->link ? phydev->speed :
++							    SPEED_UNKNOWN);
++	}
++
+ 	/* Assert the FIFO between PHY and MAC. */
+ 	ret = phy_modify(phydev, QCA8084_FIFO_CONTROL,
+ 			 QCA8084_FIFO_MAC_2_PHY | QCA8084_FIFO_PHY_2_MAC,
+@@ -1114,6 +1173,7 @@
+ 		return ret;
+ 
+ 	shared_priv = phy_package_get_priv(phydev);
++	shared_priv->phy3_addr = addr[3];
+ 	for (i = 0; i < ARRAY_SIZE(qca8084_package_clk_name); i++) {
+ 		clk = of_clk_get_by_name(np, qca8084_package_clk_name[i]);
+ 		if (IS_ERR(clk)) {
+@@ -1139,13 +1199,21 @@
+ 
+ 	for_each_available_child_of_node(np, child) {
+ 		struct mdio_device *mdiodev;
++		u32 reg;
+ 
+ 		if (of_node_name_eq(child, "pcs-phy")) {
+ 			mdiodev = qca8084_package_pcs_probe(child);
+-			if (IS_ERR(mdiodev))
++			if (IS_ERR(mdiodev)) {
++				of_node_put(child);
+ 				return PTR_ERR(mdiodev);
++			}
+ 
+-			shared_priv->mdiodev[0] = mdiodev;
++			/* PCS0 takes the MDIO address addr[4] */
++			if (!of_property_read_u32(child, "reg", &reg) &&
++			    reg == addr[4])
++				shared_priv->pcs0_mdiodev = mdiodev;
++			else
++				shared_priv->mdiodev[0] = mdiodev;
+ 		}
+ 
+ 		if (of_node_name_eq(child, "xpcs-phy")) {
+--- a/drivers/net/phy/qcom/qca8084_serdes.c
++++ b/drivers/net/phy/qcom/qca8084_serdes.c
+@@ -48,6 +48,10 @@
+ #define MODE_CONTROL_SGMII_PHY			1
+ #define MODE_CONTROL_SGMII_MAC			2
+ 
++#define CHANNEL0_CFG				0x120
++#define CHANNEL0_ADPT_RESET			BIT(11)
++#define CHANNEL0_FORCE_SPEED_MASK		GENMASK(3, 1)
++
+ #define QP_USXG_OPTION1				0x180
+ #define QP_USXG_OPTION1_DATAPASS		BIT(0)
+ #define QP_USXG_OPTION1_DATAPASS_SGMII		0
+@@ -146,9 +150,25 @@
+ 	struct clk *clks[XPCS_CLK_MAX];
+ };
+ 
++/* Clocks and resets of the GMII between PHY3 and PCS0, which are only
++ * used when PCS0 works on the PHY side of SGMII for PHY3.
++ */
++enum pcs_bypass_clk_id {
++	PCS_BYPASS_PHY_TX_CLK,
++	PCS_BYPASS_PHY_RX_CLK,
++	PCS_BYPASS_SRDS_TX_CLK,
++	PCS_BYPASS_SRDS_RX_CLK,
++	PCS_BYPASS_CLK_MAX
++};
++
+ struct qca8084_pcs_data {
+ 	struct reset_control *rstc;
+ 	struct clk *clks[PCS_CLK_MAX];
++	struct clk_bulk_data bypass_clks[PCS_BYPASS_CLK_MAX];
++	struct reset_control_bulk_data bypass_rstcs[PCS_BYPASS_CLK_MAX];
++	phy_interface_t interface;
++	bool bypass_clk_enabled;
++	bool enabled;
+ };
+ 
+ struct qca8084_xpcs_data {
+@@ -173,6 +193,13 @@
+ 	[PCS_TX_ROOT_CLK] =	"pcs_tx_root",
+ };
+ 
++static const char *const pcs_bypass_clock_names[PCS_BYPASS_CLK_MAX] = {
++	[PCS_BYPASS_PHY_TX_CLK] =	"phy_tx",
++	[PCS_BYPASS_PHY_RX_CLK] =	"phy_rx",
++	[PCS_BYPASS_SRDS_TX_CLK] =	"srds_tx",
++	[PCS_BYPASS_SRDS_RX_CLK] =	"srds_rx",
++};
++
+ static const int qca8084_xpcs_ch_mmd[QCA8084_CHANNEL_MAX] = { 31, 26, 27, 28 };
+ 
+ struct mdio_device *qca8084_package_pcs_probe(struct device_node *pcs_np)
+@@ -213,6 +240,25 @@
+ 		pcs_data->clks[i] = clk;
+ 	}
+ 
++	for (i = 0; i < PCS_BYPASS_CLK_MAX; i++) {
++		pcs_data->bypass_clks[i].id = pcs_bypass_clock_names[i];
++		pcs_data->bypass_rstcs[i].id = pcs_bypass_clock_names[i];
++	}
++
++	if (devm_clk_bulk_get_optional(dev, PCS_BYPASS_CLK_MAX,
++				       pcs_data->bypass_clks)) {
++		dev_err(dev, "Failed to get the PCS bypass clocks\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	if (devm_reset_control_bulk_get_optional_exclusive(dev,
++							   PCS_BYPASS_CLK_MAX,
++							   pcs_data->bypass_rstcs)) {
++		dev_err(dev, "Failed to get the PCS bypass resets\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	pcs_data->interface = PHY_INTERFACE_MODE_NA;
+ 	mdiodev_set_drvdata(mdiodev, pcs_data);
+ 
+ 	return mdiodev;
+@@ -780,3 +826,236 @@
+ 				   FIFO_RESET_CH1_CH2_CH3,
+ 				   FIFO_RESET_CH1_CH2_CH3);
+ }
++
++static int qca8084_pcs_enable(struct mdio_device *mdio_dev)
++{
++	struct qca8084_pcs_data *pcs_data = mdiodev_get_drvdata(mdio_dev);
++	int ret;
++
++	if (pcs_data->enabled)
++		return 0;
++
++	ret = clk_prepare_enable(pcs_data->clks[PCS_CLK]);
++	if (ret)
++		return ret;
++
++	ret = reset_control_deassert(pcs_data->rstc);
++	if (ret) {
++		clk_disable_unprepare(pcs_data->clks[PCS_CLK]);
++		return ret;
++	}
++
++	pcs_data->enabled = true;
++
++	return 0;
++}
++
++static int qca8084_pcs_sgmii_function_reset(struct mdio_device *mdio_dev)
++{
++	int ret;
++
++	ret = mdiodev_c45_modify(mdio_dev, MDIO_MMD_PMAPMD, CHANNEL0_CFG,
++				 CHANNEL0_ADPT_RESET, 0);
++	if (ret)
++		return ret;
++
++	usleep_range(1000, 1100);
++
++	ret = mdiodev_c45_modify(mdio_dev, MDIO_MMD_PMAPMD, CHANNEL0_CFG,
++				 CHANNEL0_ADPT_RESET, CHANNEL0_ADPT_RESET);
++	if (ret)
++		return ret;
++
++	return qca8084_pcs_ipg_tune_reset(mdio_dev, QP_USXG_SGMII_FUNC_RESET);
++}
++
++/* Configure the PCS as SGMII (1000M and below) or SGMII+ (2500M), on the
++ * MAC side or on the PHY side of the link. In-band auto-negotiation is
++ * used on channel 0.
++ */
++static int qca8084_pcs_sgmii_config(struct mdio_device *mdio_dev,
++				    phy_interface_t interface, bool phy_side)
++{
++	int ret;
++
++	ret = qca8084_pcs_set_interface_mode(mdio_dev, interface);
++	if (ret)
++		return ret;
++
++	ret = mdiodev_c45_modify(mdio_dev, MDIO_MMD_PMAPMD, MODE_CONTROL,
++				 MODE_CONTROL_SGMII_SEL_MASK,
++				 FIELD_PREP(MODE_CONTROL_SGMII_SEL_MASK,
++					    phy_side ? MODE_CONTROL_SGMII_PHY :
++						       MODE_CONTROL_SGMII_MAC));
++	if (ret)
++		return ret;
++
++	ret = mdiodev_c45_modify(mdio_dev, MDIO_MMD_PMAPMD, CHANNEL0_CFG,
++				 CHANNEL0_FORCE_SPEED_MASK, 0);
++	if (ret)
++		return ret;
++
++	ret = qca8084_do_calibration(mdio_dev);
++	if (ret) {
++		dev_err(&mdio_dev->dev, "PCS calibration timeout!\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++/* PCS1 is the SGMII/SGMII+ interface of switch MAC0 in the package mode
++ * QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_MAC and QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY.
++ * It also generates the 312.5MHz clock used by the switch core, AHB and
++ * APB bridge clocks of the package, so it has to be configured before
++ * these clocks are enabled.
++ */
++int qca8084_pcs_sgmii_mac_init(struct mdio_device *mdio_dev,
++			       phy_interface_t interface)
++{
++	struct qca8084_pcs_data *pcs_data = mdiodev_get_drvdata(mdio_dev);
++	int ret;
++
++	ret = qca8084_pcs_enable(mdio_dev);
++	if (ret)
++		return ret;
++
++	ret = qca8084_pcs_sgmii_config(mdio_dev, interface, false);
++	if (ret)
++		return ret;
++
++	pcs_data->interface = interface;
++
++	return qca8084_pcs_sgmii_function_reset(mdio_dev);
++}
++
++static void qca8084_pcs_bypass_clk_disable(struct qca8084_pcs_data *pcs_data)
++{
++	if (!pcs_data->bypass_clk_enabled)
++		return;
++
++	clk_bulk_disable_unprepare(PCS_BYPASS_CLK_MAX, pcs_data->bypass_clks);
++	pcs_data->bypass_clk_enabled = false;
++}
++
++static int qca8084_pcs_bypass_clk_enable(struct qca8084_pcs_data *pcs_data)
++{
++	int ret;
++
++	if (pcs_data->bypass_clk_enabled)
++		return 0;
++
++	ret = clk_bulk_prepare_enable(PCS_BYPASS_CLK_MAX,
++				      pcs_data->bypass_clks);
++	if (ret)
++		return ret;
++
++	pcs_data->bypass_clk_enabled = true;
++
++	return 0;
++}
++
++/* PCS0 works on the PHY side of SGMII/SGMII+ for PHY3 in the package mode
++ * QCA808X_PCS1_SGMII_MAC_PCS0_SGMII_PHY, which bypasses the switch core.
++ * The interface mode follows the link speed of PHY3.
++ */
++int qca8084_pcs_bypass_init(struct mdio_device *mdio_dev)
++{
++	struct qca8084_pcs_data *pcs_data = mdiodev_get_drvdata(mdio_dev);
++	int ret;
++
++	if (!pcs_data->bypass_clks[PCS_BYPASS_PHY_TX_CLK].clk ||
++	    !pcs_data->bypass_clks[PCS_BYPASS_PHY_RX_CLK].clk) {
++		dev_err(&mdio_dev->dev, "Missing PCS bypass clocks\n");
++		return -EINVAL;
++	}
++
++	ret = qca8084_pcs_enable(mdio_dev);
++	if (ret)
++		return ret;
++
++	ret = qca8084_pcs_sgmii_config(mdio_dev, PHY_INTERFACE_MODE_SGMII,
++				       true);
++	if (ret)
++		return ret;
++
++	pcs_data->interface = PHY_INTERFACE_MODE_SGMII;
++
++	return 0;
++}
++
++void qca8084_pcs_bypass_set_speed(struct mdio_device *mdio_dev, int speed)
++{
++	struct qca8084_pcs_data *pcs_data = mdiodev_get_drvdata(mdio_dev);
++	phy_interface_t interface;
++	unsigned long rate;
++	int ret;
++
++	/* Gate the GMII clocks between PHY3 and PCS0 during the change,
++	 * they stay gated when the link is down.
++	 */
++	qca8084_pcs_bypass_clk_disable(pcs_data);
++
++	/* The GMII clocks are divided from the SerDes clock of PCS0, which
++	 * is 125MHz for SGMII and 312.5MHz for SGMII+. The clock rate is
++	 * calculated with the SerDes clock rate 125MHz, the same divider
++	 * applies to 2500M with SGMII+.
++	 */
++	switch (speed) {
++	case SPEED_2500:
++		interface = PHY_INTERFACE_MODE_2500BASEX;
++		rate = 125000000;
++		break;
++	case SPEED_1000:
++		interface = PHY_INTERFACE_MODE_SGMII;
++		rate = 125000000;
++		break;
++	case SPEED_100:
++		interface = PHY_INTERFACE_MODE_SGMII;
++		rate = 25000000;
++		break;
++	case SPEED_10:
++		interface = PHY_INTERFACE_MODE_SGMII;
++		rate = 2500000;
++		break;
++	default:
++		return;
++	}
++
++	if (interface != pcs_data->interface) {
++		ret = qca8084_pcs_sgmii_config(mdio_dev, interface, true);
++		if (ret)
++			goto err;
++
++		pcs_data->interface = interface;
++	}
++
++	ret = clk_set_rate(pcs_data->bypass_clks[PCS_BYPASS_PHY_TX_CLK].clk,
++			   rate);
++	if (ret)
++		goto err;
++
++	ret = clk_set_rate(pcs_data->bypass_clks[PCS_BYPASS_PHY_RX_CLK].clk,
++			   rate);
++	if (ret)
++		goto err;
++
++	ret = qca8084_pcs_bypass_clk_enable(pcs_data);
++	if (ret)
++		goto err;
++
++	ret = reset_control_bulk_reset(PCS_BYPASS_CLK_MAX,
++				       pcs_data->bypass_rstcs);
++	if (ret)
++		goto err;
++
++	ret = qca8084_pcs_sgmii_function_reset(mdio_dev);
++	if (ret)
++		goto err;
++
++	return;
++
++err:
++	dev_err(&mdio_dev->dev, "Failed to configure speed %d: %d\n",
++		speed, ret);
++}
+--- a/drivers/net/phy/qcom/qca8084_serdes.h
++++ b/drivers/net/phy/qcom/qca8084_serdes.h
+@@ -10,6 +10,7 @@
+ 
+ #include <linux/mdio.h>
+ #include <linux/of.h>
++#include <linux/phy.h>
+ 
+ struct mdio_device *qca8084_package_pcs_probe(struct device_node *pcs_np);
+ struct mdio_device *qca8084_package_xpcs_probe(struct device_node *xpcs_np);
+@@ -20,4 +21,8 @@
+ void qca8084_qxgmii_set_speed(struct mdio_device *xpcs_mdiodev,
+ 			      struct mdio_device *pcs_mdiodev,
+ 			      int channel, int speed);
++int qca8084_pcs_sgmii_mac_init(struct mdio_device *mdio_dev,
++			       phy_interface_t interface);
++int qca8084_pcs_bypass_init(struct mdio_device *mdio_dev);
++void qca8084_pcs_bypass_set_speed(struct mdio_device *mdio_dev, int speed);
+ #endif /* _QCA8084_SERDES_H_ */

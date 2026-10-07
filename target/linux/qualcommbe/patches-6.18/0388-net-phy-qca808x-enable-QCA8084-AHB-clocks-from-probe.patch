@@ -1,0 +1,99 @@
+From: Mark Chiou <chiouss@gmail.com>
+Date: Wed, 7 Oct 2026 14:00:00 +0800
+Subject: [PATCH] net: phy: qca808x: enable QCA8084 AHB clocks from probe
+
+The AHB clocks of the PHY package are needed to access its registers,
+but they were only enabled at the end of config_init, after the package
+mode and the EPHY LDO were already written. Between probe and the PHY
+being attached, these clocks are disabled as unused clocks, which drops
+those register writes silently. The package mode then stays at the
+hardware default, and on boards where that is not the wanted mode, the
+PHY is not connected to the SoC.
+
+Enable the AHB clocks when probing the PHY package, which also avoids
+disabling the clocks that cannot be turned off:
+
+  nss_cc_ahb_clk status stuck at 'on'
+
+The APB bridge and switch core clocks are still enabled in config_init,
+since they need the 312.5MHz clock from PCS1.
+
+Signed-off-by: Mark Chiou <chiouss@gmail.com>
+---
+--- a/drivers/net/phy/qcom/qca808x.c
++++ b/drivers/net/phy/qcom/qca808x.c
+@@ -888,35 +888,37 @@
+ 	/* Configure clock rate 104.17MHZ for the PHY package
+ 	 * AHB clock tree.
+ 	 */
+-	ret = clk_set_rate(shared_priv->clk[AHB_CLK], 104170000);
+-	if (ret)
+-		return ret;
+-
+-	ret = clk_prepare_enable(shared_priv->clk[AHB_CLK]);
+-	if (ret)
+-		return ret;
+-
+-	ret = clk_prepare_enable(shared_priv->clk[SEC_CTRL_AHB_CLK]);
+-	if (ret)
+-		return ret;
+-
+-	ret = clk_prepare_enable(shared_priv->clk[TLMM_CLK]);
+-	if (ret)
+-		return ret;
+-
+-	ret = clk_prepare_enable(shared_priv->clk[TLMM_AHB_CLK]);
+-	if (ret)
+-		return ret;
++	return clk_set_rate(shared_priv->clk[AHB_CLK], 104170000);
++}
+ 
+-	ret = clk_prepare_enable(shared_priv->clk[CNOC_AHB_CLK]);
+-	if (ret)
+-		return ret;
++/* The AHB clocks are needed to access the registers of the PHY package,
++ * such as the package mode configured in config_init. They are enabled
++ * from probe, otherwise they can be disabled as unused clocks before the
++ * PHY is attached, which silently drops the register writes.
++ */
++static int qca8084_package_ahb_clock_enable(struct qca808x_shared_priv *shared_priv)
++{
++	static const int ahb_clks[] = {
++		AHB_CLK,
++		SEC_CTRL_AHB_CLK,
++		TLMM_CLK,
++		TLMM_AHB_CLK,
++		CNOC_AHB_CLK,
++		MDIO_MASTER_AHB_CLK,
++		MDIO_AHB_CLK,
++	};
++	int i, ret;
+ 
+-	ret = clk_prepare_enable(shared_priv->clk[MDIO_MASTER_AHB_CLK]);
+-	if (ret)
+-		return ret;
++	for (i = 0; i < ARRAY_SIZE(ahb_clks); i++) {
++		ret = clk_prepare_enable(shared_priv->clk[ahb_clks[i]]);
++		if (ret) {
++			while (--i >= 0)
++				clk_disable_unprepare(shared_priv->clk[ahb_clks[i]]);
++			return ret;
++		}
++	}
+ 
+-	return clk_prepare_enable(shared_priv->clk[MDIO_AHB_CLK]);
++	return 0;
+ }
+ 
+ static int qca8084_phy_package_config_init_once(struct phy_device *phydev)
+@@ -1160,6 +1162,10 @@
+ 		return dev_err_probe(&phydev->mdio.dev, PTR_ERR(rstc),
+ 				     "package reset not ready\n");
+ 
++	ret = qca8084_package_ahb_clock_enable(shared_priv);
++	if (ret)
++		return ret;
++
+ 	/* Deassert PHY package. */
+ 	return reset_control_deassert(rstc);
+ }
